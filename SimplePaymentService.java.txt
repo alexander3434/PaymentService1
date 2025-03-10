@@ -1,0 +1,90 @@
+package io.ffuel.facade.model.gpn;
+import java.math.BigDecimal;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+public class SimplePaymentService implements PaymentService {
+
+    private static final Logger logger = Logger.getLogger(SimplePaymentService.class.getName());
+
+    // Хранение балансов счетов в виде Map, где ключ — идентификатор счёта, значение — баланс
+    private final Map<String, BigDecimal> accounts = new HashMap<>();
+
+    @Override
+    public BigDecimal balance(String accountId) {
+        // Логируем запрос баланса
+        logger.log(Level.INFO, "Запрос баланса для счёта: " + accountId);
+
+        // Возвращает баланс счёта. Если счёт не существует, возвращает 0.
+        BigDecimal balance = accounts.getOrDefault(accountId, BigDecimal.ZERO);
+
+        // Логируем результат запроса баланса
+        logger.log(Level.INFO, "Баланс для счёта " + accountId + ": " + balance);
+
+        return balance;
+    }
+
+    @Override
+    public boolean transfer(String fromAccountId, String toAccountId, BigDecimal amount) {
+        // Логируем начало операции перевода
+        logger.log(Level.INFO, "Начало перевода: счёт отправителя " + fromAccountId +
+                ", счёт получателя " + toAccountId + ", сумма " + amount);
+
+        // Получаем текущий баланс
+        BigDecimal fromBalance = accounts.getOrDefault(fromAccountId, BigDecimal.ZERO);
+        BigDecimal toBalance = accounts.getOrDefault(toAccountId, BigDecimal.ZERO);
+
+        // Логируем текущие балансы
+        logger.log(Level.INFO, "Текущий баланс счёта отправителя " + fromAccountId + ": " + fromBalance);
+        logger.log(Level.INFO, "Текущий баланс счёта получателя " + toAccountId + ": " + toBalance);
+
+        // Проверяем, достаточно ли средств на счёте отправителя
+        if (fromBalance.compareTo(amount) < 0) {
+            // Логируем неудачную попытку перевода из-за недостатка средств
+            logger.log(Level.WARNING, "Недостаточно средств на счёте отправителя " + fromAccountId +
+                    " для перевода суммы " + amount);
+            return false; // Если средств недостаточно, возвращаем false
+        }
+
+        //Уменьшаем баланс счёта отправителя
+        accounts.put(fromAccountId, fromBalance.subtract(amount));
+        //Увеличиваем баланс счёта получателя
+        accounts.put(toAccountId, toBalance.add(amount));
+
+        // Логируем успешное выполнение перевода
+        logger.log(Level.INFO, "Перевод выполнен успешно. Новый баланс счёта отправителя " + fromAccountId +
+                ": " + accounts.get(fromAccountId));
+        logger.log(Level.INFO, "Новый баланс счёта получателя " + toAccountId + ": " + accounts.get(toAccountId));
+
+        // Возвращаем true, если перевод выполнен успешно
+        return true;
+    }
+
+    public class Main {
+        public static void main(String[] args) {
+            PaymentService paymentService = new SimplePaymentService();
+
+            // Устанавливаем начальный баланс для счетов
+            paymentService.transfer("system", "account123", new BigDecimal("1000.00"));
+            paymentService.transfer("system", "account456", new BigDecimal("500.00"));
+
+            // Проверяем баланс счетов
+            System.out.println("Баланс счёта account123: " + paymentService.balance("account123"));
+            System.out.println("Баланс счёта account456: " + paymentService.balance("account456"));
+
+            // Выполняем перевод
+            boolean transferResult = paymentService.transfer("account123", "account456", new BigDecimal("200.00"));
+            if (transferResult) {
+                System.out.println("Перевод выполнен успешно!");
+            } else {
+                System.out.println("Перевод не удался: недостаточно средств.");
+            }
+
+            // Проверяем баланс после перевода
+            System.out.println("Баланс счёта account123 после перевода: " + paymentService.balance("account123"));
+            System.out.println("Баланс счёта account456 после перевода: " + paymentService.balance("account456"));
+        }
+    }
+}
